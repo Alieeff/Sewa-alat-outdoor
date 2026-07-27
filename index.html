@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jejak Sewa — Peminjaman Alat Outdoor</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="brand">Jejak<span>Sewa</span></a>
+  <div class="navlinks" id="nav-links"></div>
+</nav>
+<div class="contour"></div>
+
+<section class="hero">
+  <h1>Alat naik gunung lengkap, tanpa perlu beli.</h1>
+  <p>Sewa tenda, carrier, kompor, dan perlengkapan outdoor lainnya. Jelas harganya, mudah prosesnya.</p>
+</section>
+
+<div class="container">
+  <div id="alat-grid" class="grid">
+    <p class="mono" style="color:var(--text-dim)">Memuat alat...</p>
+  </div>
+</div>
+
+<footer>Jejak Sewa — Final Project E-Business Design, Universitas AMIKOM Yogyakarta</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="common.js"></script>
+<script>
+async function loadAlat() {
+  const { data, error } = await supabaseClient.from('alat').select('*').order('created_at', { ascending: false });
+  const grid = document.getElementById('alat-grid');
+  if (error) { grid.innerHTML = `<p class="msg error">Gagal memuat data: ${error.message}</p>`; return; }
+  if (!data || data.length === 0) { grid.innerHTML = `<p class="mono" style="color:var(--text-dim)">Belum ada alat yang tersedia.</p>`; return; }
+  grid.innerHTML = data.map(alat => `
+    <a href="alat.html?id=${alat.id}" class="card">
+      <img src="${alat.foto_url || 'https://placehold.co/400x300/223328/8fa88a?text=Alat+Outdoor'}" alt="${alat.nama_alat}">
+      <div class="body">
+        <span class="badge">${alat.kategori}</span>
+        <h3>${alat.nama_alat}</h3>
+        <span class="price">${formatRupiah(alat.harga_per_hari)}/hari</span>
+      </div>
+    </a>
+  `).join('');
+}
+setupNavbar();
+loadAlat();
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Admin — Jejak Sewa</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="brand">Jejak<span>Sewa</span></a>
+  <div class="navlinks" id="nav-links"></div>
+</nav>
+<div class="contour"></div>
+
+<div class="container">
+  <h2>Panel Admin</h2>
+  <div class="tabs">
+    <div class="tab active" data-tab="alat">Kelola Alat</div>
+    <div class="tab" data-tab="pesanan">Kelola Pesanan</div>
+  </div>
+
+  <div id="tab-alat">
+    <div class="panel-box">
+      <h3>Tambah Alat Baru</h3>
+      <form id="alat-form">
+        <label>Nama alat</label><input type="text" id="nama_alat" required>
+        <label>Kategori</label><input type="text" id="kategori" placeholder="Tenda, Carrier, Memasak, dll" required>
+        <label>Deskripsi</label><textarea id="deskripsi" rows="2"></textarea>
+        <label>Harga per hari (Rp)</label><input type="number" id="harga_per_hari" required>
+        <label>Stok</label><input type="number" id="stok" value="1" required>
+        <label>URL Foto (opsional)</label><input type="url" id="foto_url" placeholder="https://...">
+        <button type="submit" class="btn" style="margin-top:16px;">Simpan Alat</button>
+      </form>
+      <div id="alat-msg"></div>
+    </div>
+    <div id="alat-list" style="margin-top:24px;"></div>
+  </div>
+
+  <div id="tab-pesanan" style="display:none;">
+    <div id="pesanan-list"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="common.js"></script>
+<script>
+async function checkAdmin() {
+  const user = await getCurrentUser();
+  if (!user) { window.location.href = 'login.html'; return false; }
+  const profile = await getProfile(user.id);
+  if (!profile || !profile.is_admin) { window.location.href = 'index.html'; return false; }
+  return true;
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-alat').style.display = tab.dataset.tab === 'alat' ? 'block' : 'none';
+    document.getElementById('tab-pesanan').style.display = tab.dataset.tab === 'pesanan' ? 'block' : 'none';
+    if (tab.dataset.tab === 'pesanan') loadPesanan();
+  });
+});
+
+async function loadAlatList() {
+  const { data } = await supabaseClient.from('alat').select('*').order('created_at', { ascending: false });
+  const el = document.getElementById('alat-list');
+  el.innerHTML = `<table><thead><tr><th>Nama</th><th>Harga</th><th>Stok</th><th></th></tr></thead><tbody>
+  ${(data || []).map(a => `<tr>
+    <td>${a.nama_alat}</td><td class="mono">${formatRupiah(a.harga_per_hari)}</td><td>${a.stok}</td>
+    <td><button class="btn outline" style="padding:6px 12px;font-size:.8rem;" onclick="hapusAlat('${a.id}')">Hapus</button></td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+async function hapusAlat(id) {
+  if (!confirm('Hapus alat ini?')) return;
+  await supabaseClient.from('alat').delete().eq('id', id);
+  loadAlatList();
+}
+
+document.getElementById('alat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    nama_alat: document.getElementById('nama_alat').value,
+    kategori: document.getElementById('kategori').value,
+    deskripsi: document.getElementById('deskripsi').value,
+    harga_per_hari: Number(document.getElementById('harga_per_hari').value),
+    stok: Number(document.getElementById('stok').value),
+    foto_url: document.getElementById('foto_url').value || null
+  };
+  const { error } = await supabaseClient.from('alat').insert(payload);
+  const msg = document.getElementById('alat-msg');
+  msg.innerHTML = error ? `<div class="msg error">${error.message}</div>` : `<div class="msg success">Alat ditambahkan.</div>`;
+  if (!error) { e.target.reset(); loadAlatList(); }
+});
+
+async function loadPesanan() {
+  const { data, error } = await supabaseClient
+    .from('penyewaan')
+    .select('*, alat(nama_alat), profiles(nama, no_hp)')
+    .order('created_at', { ascending: false });
+  const el = document.getElementById('pesanan-list');
+  if (error) { el.innerHTML = `<p class="msg error">${error.message}</p>`; return; }
+  el.innerHTML = `<table><thead><tr><th>Penyewa</th><th>Alat</th><th>Tanggal</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+  ${(data || []).map(p => `<tr>
+    <td>${p.profiles ? p.profiles.nama : '-'}<br><span class="mono" style="color:var(--text-dim);font-size:.75rem;">${p.profiles ? p.profiles.no_hp : ''}</span></td>
+    <td>${p.alat ? p.alat.nama_alat : '-'}</td>
+    <td class="mono">${p.tanggal_mulai} &rarr; ${p.tanggal_selesai}</td>
+    <td class="mono">${formatRupiah(p.total_bayar)}</td>
+    <td><span class="status ${p.status}">${statusLabel(p.status)}</span></td>
+    <td>
+      <select onchange="updateStatus('${p.id}', this.value)" style="padding:4px 6px;font-size:.78rem;">
+        <option value="">Ubah...</option>
+        <option value="dikonfirmasi">Konfirmasi</option>
+        <option value="selesai">Selesai</option>
+        <option value="batal">Batalkan</option>
+      </select>
+    </td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+async function updateStatus(id, status) {
+  if (!status) return;
+  await supabaseClient.from('penyewaan').update({ status }).eq('id', id);
+  loadPesanan();
+}
+
+(async () => {
+  const ok = await checkAdmin();
+  if (ok) { setupNavbar(); loadAlatList(); }
+})();
+</script>
+</body>
+</html>

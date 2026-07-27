@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detail Alat — Jejak Sewa</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="brand">Jejak<span>Sewa</span></a>
+  <div class="navlinks" id="nav-links"></div>
+</nav>
+<div class="contour"></div>
+
+<div class="container" style="max-width:560px;">
+  <div id="detail" class="panel-box">Memuat...</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="common.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const alatId = params.get('id');
+
+function bookingFormHtml() {
+  return `
+  <h3>Form Peminjaman</h3>
+  <form id="booking-form">
+    <label>Tanggal mulai</label><input type="date" id="tgl_mulai" required>
+    <label>Tanggal selesai</label><input type="date" id="tgl_selesai" required>
+    <label>Jumlah unit</label><input type="number" id="jumlah" min="1" value="1" required>
+    <p class="mono" id="total-preview" style="margin-top:14px;color:var(--accent-light)"></p>
+    <button type="submit" class="btn block" style="margin-top:10px;">Ajukan Peminjaman</button>
+  </form>
+  <div id="booking-msg"></div>`;
+}
+
+function attachBookingHandler(alat) {
+  const form = document.getElementById('booking-form');
+  const preview = document.getElementById('total-preview');
+  function updatePreview() {
+    const mulaiVal = document.getElementById('tgl_mulai').value;
+    const selesaiVal = document.getElementById('tgl_selesai').value;
+    if (!mulaiVal || !selesaiVal) return;
+    const mulai = new Date(mulaiVal);
+    const selesai = new Date(selesaiVal);
+    const jumlah = Number(document.getElementById('jumlah').value || 1);
+    const hari = Math.max(1, Math.round((selesai - mulai) / 86400000));
+    preview.textContent = `Total: ${formatRupiah(hari * jumlah * alat.harga_per_hari)} (${hari} hari x ${jumlah} unit)`;
+  }
+  form.addEventListener('input', updatePreview);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const user = await getCurrentUser();
+    const mulai = document.getElementById('tgl_mulai').value;
+    const selesai = document.getElementById('tgl_selesai').value;
+    const jumlah = Number(document.getElementById('jumlah').value);
+    const hari = Math.max(1, Math.round((new Date(selesai) - new Date(mulai)) / 86400000));
+    const total = hari * jumlah * alat.harga_per_hari;
+    const { data, error } = await supabaseClient.from('penyewaan').insert({
+      user_id: user.id, alat_id: alat.id, tanggal_mulai: mulai, tanggal_selesai: selesai,
+      jumlah, total_bayar: total, status: 'menunggu_konfirmasi'
+    }).select().single();
+    const msg = document.getElementById('booking-msg');
+    if (error) { msg.innerHTML = `<div class="msg error">${error.message}</div>`; return; }
+    const waText = encodeURIComponent(`Halo, saya ingin konfirmasi peminjaman "${alat.nama_alat}" (ID: ${data.id.slice(0,8)}) sebesar ${formatRupiah(total)}.`);
+    msg.innerHTML = `<div class="msg success">Peminjaman diajukan! Silakan konfirmasi pembayaran via <a href="https://wa.me/6281234567890?text=${waText}" target="_blank" style="color:#7ed99a;text-decoration:underline;">WhatsApp Admin</a>.</div>`;
+    form.querySelector('button').disabled = true;
+  });
+}
+
+async function loadDetail() {
+  const { data: alat, error } = await supabaseClient.from('alat').select('*').eq('id', alatId).single();
+  const el = document.getElementById('detail');
+  if (error || !alat) { el.innerHTML = '<p class="msg error">Alat tidak ditemukan.</p>'; return; }
+  const user = await getCurrentUser();
+  el.innerHTML = `
+    <img src="${alat.foto_url || 'https://placehold.co/600x360/223328/8fa88a?text=Alat+Outdoor'}" style="width:100%;border-radius:4px;max-height:320px;object-fit:cover;">
+    <span class="badge" style="margin-top:16px;">${alat.kategori}</span>
+    <h2 style="margin-top:8px;">${alat.nama_alat}</h2>
+    <p style="color:var(--text-dim);margin-top:8px;">${alat.deskripsi || ''}</p>
+    <p class="price" style="font-size:1.3rem;margin-top:10px;">${formatRupiah(alat.harga_per_hari)} / hari &middot; Stok: ${alat.stok}</p>
+    <div class="contour" style="margin:20px -24px;"></div>
+    ${user ? bookingFormHtml() : `<p class="mono" style="color:var(--text-dim)">Silakan <a href="login.html" style="color:var(--accent-light)">masuk</a> untuk menyewa alat ini.</p>`}
+  `;
+  if (user) attachBookingHandler(alat);
+}
+
+setupNavbar();
+loadDetail();
+</script>
+</body>
+</html>

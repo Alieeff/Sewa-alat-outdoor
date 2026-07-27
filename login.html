@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masuk — Jejak Sewa</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="brand">Jejak<span>Sewa</span></a>
+  <div class="navlinks" id="nav-links"></div>
+</nav>
+<div class="contour"></div>
+<div class="container" style="max-width:420px;">
+  <h2>Masuk</h2>
+  <div class="panel-box" style="margin-top:20px;">
+    <form id="login-form">
+      <label>Email</label>
+      <input type="email" id="email" required>
+      <label>Kata sandi</label>
+      <input type="password" id="password" required>
+      <button type="submit" class="btn block" style="margin-top:20px;">Masuk</button>
+    </form>
+    <div id="msg"></div>
+    <p class="mono" style="margin-top:16px; font-size:.85rem; color:var(--text-dim);">Belum punya akun? <a href="register.html" style="color:var(--accent-light)">Daftar di sini</a></p>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="common.js"></script>
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const msg = document.getElementById('msg');
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) { msg.innerHTML = `<div class="msg error">${error.message}</div>`; return; }
+  window.location.href = 'index.html';
+});
+setupNavbar();
+</script>
+</body>
+</html>

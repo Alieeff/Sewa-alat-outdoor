@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pesanan Saya — Jejak Sewa</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="brand">Jejak<span>Sewa</span></a>
+  <div class="navlinks" id="nav-links"></div>
+</nav>
+<div class="contour"></div>
+
+<div class="container">
+  <h2>Pesanan Saya</h2>
+  <div id="list" style="margin-top:20px;"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="common.js"></script>
+<script>
+async function loadDashboard() {
+  const user = await getCurrentUser();
+  if (!user) { window.location.href = 'login.html'; return; }
+  const { data, error } = await supabaseClient
+    .from('penyewaan')
+    .select('*, alat(nama_alat, harga_per_hari)')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+  const list = document.getElementById('list');
+  if (error) { list.innerHTML = `<p class="msg error">${error.message}</p>`; return; }
+  if (!data.length) { list.innerHTML = `<p class="mono" style="color:var(--text-dim)">Belum ada riwayat peminjaman.</p>`; return; }
+  list.innerHTML = `<table><thead><tr><th>Alat</th><th>Tanggal</th><th>Jumlah</th><th>Total</th><th>Status</th></tr></thead><tbody>
+  ${data.map(p => `<tr>
+    <td>${p.alat ? p.alat.nama_alat : '-'}</td>
+    <td class="mono">${p.tanggal_mulai} &rarr; ${p.tanggal_selesai}</td>
+    <td>${p.jumlah}</td>
+    <td class="mono">${formatRupiah(p.total_bayar)}</td>
+    <td><span class="status ${p.status}">${statusLabel(p.status)}</span></td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+setupNavbar();
+loadDashboard();
+</script>
+</body>
+</html>
